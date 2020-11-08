@@ -1,90 +1,92 @@
 ---
 title: "Prediction Assignment"
 author: "Aritra"
-date: "30/10/2020"
+date: "08/11/2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+```{r}
+library(rpart)
+library(randomForest)
+library(caret)
+library(rattle)
+set.seed(2000)
+
+## To Fetch the Data ##
+## The data was dowloaded and readed by command csv
+url_train <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+rawdata <- read.csv(url_train, na.strings = c("", "NA"))
+url_submit <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+submit_data <- read.csv(url_submit, na.strings = c("", "NA"))
 
 
 
 
 
-## Installing  Packages
-IscaretInstalled <- require("caret")
-if(!IscaretInstalled){
-    install.packages("caret")
-    library("caret")
-    }
 
-IsrandomForestInstalled <- require("randomForest")
-if(!IsrandomForestInstalled){
-    install.packages("randomForest")
-    library("randomForest")
-    }
-
-IsRpartInstalled <- require("rpart")        
-if(!IsRpartInstalled){
-    install.packages("rpart")
-    library("rpart")
-    }
-
-##Set seed 
-set.seed(20000)
-
-
-## Cleaning data 
-
-training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))  
-testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
-
-training<-training[,colSums(is.na(training)) == 0]
-testing <-testing[,colSums(is.na(testing)) == 0]
-
-
-training   <-training[,-c(1:7)]
-testing <-testing[,-c(1:7)]
-
-# The data after cleaning
-dim(training)
-
-## Cross-validation
-
-inTrain <- createDataPartition(y=training$classe, p=0.75, list=FALSE)    
-NEOTraining <- training[inTrain, ]
-NEOTesting <- training[-inTrain, ]  
-dim(NEOTraining)
-dim(NEOTesting) 
-
-#V-) Prediction Models
-
-
-## Model Tree
-fitDT <- rpart(classe ~ ., data=NEOTraining, method="class")
-
-
-predictionDT <- predict(fitDT, NEOTesting, type = "class")
-
-str(NEOTesting$classe)
-str(predictionDT)
-
-confusionMatrix(NEOTesting$classe, predictionDT)
-
-## RANDOM FOREST
-fitRF <- randomForest(classe ~ ., data=NEOTraining, method="class")
-
-predictionRF <- predict(fitRF, NEOTesting, type = "class")
-
-confusionMatrix(NEOTesting$classe, predictionRF)
-
-## Testing 
-predictSubmission <- predict(fitRF, testing, type="class")
-predictSubmission
+#Remove NA column, I have cleaned the data and remove the values containing NA so as to avoid error
+colname <- colnames(rawdata)[!colSums(is.na(rawdata)) > 0]
+colname
 
 
 
-```
+#Clean the data which is needed
+colname <- colname[8: length(colname)]
+df_wo_NA <- rawdata[colname]
 
+#Check the colnames of df_wo_NA is in submit_data.
+#The last colname is "classe"
+is.element(colname, colnames(submit_data))
+
+
+
+
+#I have split the data into random training and test set.
+
+inTrain = createDataPartition(df_wo_NA$classe, p = 3/4)[[1]]
+training = df_wo_NA[ inTrain,]
+testing = df_wo_NA[-inTrain,]
+
+
+
+
+
+
+## The time taken will be longerbut the accuracy level will be high.
+
+model_rf <- train(classe ~ ., data = training, method = "rf")
+pred_rf <- predict(model_rf, testing)
+confusionMatrix(testing$classe, pred_rf)
+
+
+
+
+
+
+
+
+## Here I did linear Discriminant Analysis andthe time taken was shortbut the result were not accurate
+
+model_lda <- train(classe ~ ., data = training, method = "lda")
+pred_lda <- predict(model_lda, testing)
+confusionMatrix(testing$classe, pred_lda)
+
+
+
+
+
+
+## Here I have tried to make Regression tree but the result were with low accuracy
+
+model_rpart <- train(classe ~ ., data = training, method = "rpart")
+pred_rpart<- predict(model_rpart, testing)
+confusionMatrix(testing$classe, pred_rpart)
+
+
+## Here, we can see the data visually
+
+fancyRpartPlot(model_rpart$finalModel)
+
+## The data is highly accurate with value of 99
+submit_rf <- predict(model_rf, submit_data)
+submit_rf
